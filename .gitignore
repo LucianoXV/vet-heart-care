@@ -1,0 +1,84 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+ENV/
+env/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Banco de dados
+*.db
+*.sqlite3
+db.sqlite3
+
+# Logs
+*.log
+
+# Arquivos temporários
+*.tmp
+*.temp
+/tmp/
+/temp/
+
+# Arquivos gerados
+*.docx
+!heartcaresite/upload_folder/Laudo Eco Modelo P.docx
+laudos_gerados/
+
+# Uploads (se houver)
+upload_folder/*.pdf
+!upload_folder/Laudo Eco Modelo P.docx
+
+# Arquivos de configuração local
+.env
+.env.local
+*.local
+
+# Certificados e chaves
+*.pem
+*.key
+*.crt
+
+# Arquivos de backup
+*.bak
+*.backup
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+

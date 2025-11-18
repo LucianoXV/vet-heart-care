@@ -1,0 +1,33 @@
+# Configuração do Streamlit para produção
+# Este arquivo define configurações de segurança e performance
+
+[server]
+# Permitir acesso de qualquer IP (necessário para acesso público)
+headless = true
+
+# Porta (será definida pelo serviço de hosting)
+port = 8501
+
+# Configurações de segurança
+enableCORS = false
+enableXsrfProtection = true
+
+# Upload máximo de arquivo (50MB)
+maxUploadSize = 50
+
+# Máximo de conexões simultâneas
+maxMessageSize = 50
+
+[browser]
+# Abrir automaticamente no navegador (desabilitado em produção)
+gatherUsageStats = false
+serverAddress = "localhost"
+
+[theme]
+# Tema padrão
+primaryColor = "#1f77b4"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f0f2f6"
+textColor = "#262730"
+font = "sans serif"
+

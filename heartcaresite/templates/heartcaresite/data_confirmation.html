@@ -1,0 +1,128 @@
+{% load static %} 
+
+<link href="{% static 'uikit/css/uikit.min.css' %}" rel="stylesheet">
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Confirm Data</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="css/uikit.min.css" />
+    <script src="js/uikit.min.js"></script>
+    <script src="js/uikit-icons.min.js"></script>
+    
+</head>
+<body>
+    <div class="uk-child-width-expand@s uk-text-center" uk-grid>
+        <div class="uk-text-large">Dados do Exame</div>
+        <br> 
+        
+        <form method="post" enctype="multipart/form-data" class="uk-form-stacked">
+            <div class="uk-child-width-expand@s uk-text-center" uk-grid>
+                <div class="uk-card uk-card-default uk-card-body">
+                    <div class="uk-width-1-1">
+                        {{ form.date_of_exam.errors }}
+                        {{ form.date_of_exam.label_tag }}
+                        {{ form.date_of_exam }}
+                    </div>
+                    <div class="uk-width-1-1">
+                        {{ form.owner_name.errors }}
+                        {{ form.owner_name.label_tag }}
+                        {{ form.owner_name }}
+                    </div>
+                    <div class="uk-width-1-1">
+                        {{ form.email.errors }}
+                        {{ form.email.label_tag }}
+                        {{ form.email }}
+                    </div>
+
+                    {{ form.phone.errors }}
+                    {{ form.phone.label_tag }}
+                    {{ form.phone }}
+
+                    {{ form.address.errors }}
+                    {{ form.address.label_tag }}
+                    {{ form.address }}
+                </div>
+                <div class="uk-card uk-card-default uk-card-body">
+                    <div class="uk-width-1-1">
+                        {{ form.animal_name.errors }}
+                        {{ form.animal_name.label_tag }}
+                        {{ form.animal_name }}
+
+                        {{ form.sex.errors }}
+                        {{ form.sex.label_tag }}
+                        {{ form.sex }}
+                    </div>
+                    <div class="uk-width-1-1">
+                        {{ form.species.errors }}
+                        {{ form.species.label_tag }}
+                        {{ form.species }}
+
+                        {{ form.age.errors }}
+                        {{ form.age.label_tag }}
+                        {{ form.age }}
+                    </div>
+                    <div class="uk-width-1-1">
+                        {{ form.breed.errors }}
+                        {{ form.breed.label_tag }}
+                        {{ form.breed }}
+
+                        {{ form.weight.errors }}
+                        {{ form.weight.label_tag }}
+                        {{ form.weight }}
+                    </div>
+                </div>
+                <div class="uk-card uk-card-default uk-card-body">
+                    <div class="uk-width-1-1">
+                        {{ form.record_number.errors }}
+                        {{ form.record_number.label_tag }}
+                        {{ form.record_number }}
+
+                        {{ form.place.errors }}
+                        {{ form.place.label_tag }}
+                        {{ form.place }}
+                    </div>
+                    <div class="uk-width-1-1">
+                        {{ form.fup_date.errors }}
+                        {{ form.fup_date.label_tag }}
+                        {{ form.fup_date }}
+                    </div>
+                    <div class="uk-width-1-1">
+                        {{ form.notes.errors }}
+                        {{ form.notes.label_tag }}
+                        {{ form.notes }}
+                    </div>
+                    <div class="uk-width-1-1">
+                        {{ form.conclusion.errors }}
+                        {{ form.conclusion.label_tag }}
+                        {{ form.conclusion }}
+                    </div>
+                </div>
+            </div>
+           <!--
+            <div class="uk-form-controls">
+                {% csrf_token %}
+
+                {{ form.as_p }}
+
+                <button class="uk-button uk-button-primary" type="submit">Gerar Doc</button>
+            </div>
+            -->
+            {% csrf_token %}
+            <button class="uk-button uk-button-primary" type="submit" name="submit_button">Gerar Doc</button>
+            
+        </form>
+        <form method="POST" action="{% url 'voltar_action' %}">
+            {% csrf_token %}
+            <button class="uk-button uk-button-default" name="goback_button">Voltar</button>
+        </form>
+    </div>
+</body>
+</html>
+<!-- JavaScript section -->
+<script>
+    document.getElementById('redirectButton').addEventListener('click', function() {
+        window.location.href = "{% url 'upload_pdf' %}";
+    });
+</script>
