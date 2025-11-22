@@ -1,0 +1,125 @@
+🩺 VET HEART CARE - INSTRUÇÕES DE INSTALAÇÃO
+=============================================
+
+Este guia irá ajudá-lo a instalar o Vet Heart Care no seu Mac.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 ANTES DE COMEÇAR
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Certifique-se de ter:
+  ✅ Python 3.8 ou superior instalado
+  ✅ Conexão com internet (para baixar dependências)
+  ✅ Pelo menos 500 MB de espaço livre no disco
+
+Para verificar se tem Python:
+  - Abra o Terminal e digite: python3 --version
+  - Se não tiver, instale em: https://www.python.org/downloads/
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🚀 OPÇÃO 1: INSTALAÇÃO COM INTERFACE GRÁFICA (RECOMENDADO)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Primeiro, execute o script preparador (uma única vez):
+   
+   - Dê um duplo clique no arquivo "preparar_arquivos.py"
+   - Ou abra o Terminal e digite: python3 preparar_arquivos.py
+   - Isso tornará os arquivos executáveis
+
+2. Instalar o sistema:
+   
+   - Dê um duplo clique no arquivo "instalar.py"
+   
+   Se aparecer um aviso de segurança:
+   - Clique com botão direito no arquivo
+   - Selecione "Abrir com" → "Python Launcher"
+   - Ou abra o Terminal e digite: python3 instalar.py
+
+3. Na janela que abrir:
+   - Clique no botão "▶ Instalar Agora"
+   - Aguarde a instalação terminar (pode levar alguns minutos)
+   - Você verá o progresso na tela
+
+4. Quando aparecer "✅ Instalação Concluída":
+   - A instalação está completa!
+   - Feche a janela
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 OPÇÃO 2: INSTALAÇÃO POR DUPLO CLIQUE (MAIS SIMPLES)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Primeiro, execute o preparador:
+   - Dê um duplo clique em "preparar_arquivos.py"
+
+2. Instalar:
+   - Dê um duplo clique no arquivo "Iniciar_Instalacao.command"
+   
+   Se aparecer um aviso de segurança:
+   - Clique com botão direito no arquivo
+   - Selecione "Abrir"
+   - Confirme abrindo
+
+3. Aguarde:
+   - O Terminal abrirá automaticamente
+   - A instalação será feita automaticamente
+   - Quando terminar, pressione ENTER
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+▶️ PARA INICIAR A APLICAÇÃO APÓS INSTALAÇÃO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Método 1 (Mais fácil):
+  - Dê um duplo clique no arquivo "Iniciar_Aplicacao.command"
+  - A aplicação abrirá automaticamente no seu navegador
+  - O endereço será: http://localhost:8501
+
+Método 2 (Via Terminal):
+  - Abra o Terminal
+  - Navegue até a pasta do projeto: cd /caminho/do/projeto
+  - Digite: python3 run_streamlit.py
+
+Para parar a aplicação:
+  - Feche a janela do Terminal
+  - Ou pressione Ctrl+C no Terminal
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚠️ PROBLEMAS COMUNS E SOLUÇÕES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Problema: "Python não encontrado"
+Solução: 
+  - Instale Python de: https://www.python.org/downloads/
+  - Ou via Homebrew: brew install python3
+
+Problema: "Não é possível abrir porque não é de um desenvolvedor..."
+Solução:
+  - Clique com botão direito no arquivo
+  - Selecione "Abrir"
+  - Confirme abrindo
+
+Problema: "Template não encontrado"
+Solução:
+  - Verifique se o arquivo "Laudo Eco Modelo P.docx" está em:
+    heartcaresite/upload_folder/
+  - A aplicação funcionará, mas não poderá gerar laudos sem o template
+
+Problema: Porta já em uso
+Solução:
+  - Feche outras aplicações que possam estar usando a porta 8501
+  - Ou edite o arquivo run_streamlit.py para usar outra porta
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📞 PRECISA DE AJUDA?
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Consulte o arquivo "INSTALACAO.md" para instruções detalhadas.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Boa sorte com a instalação! 🩺
