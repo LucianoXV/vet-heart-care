@@ -1,0 +1,35 @@
+{% load static %} 
+
+<link href="{% static 'uikit/css/uikit.min.css' %}" rel="stylesheet">
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Upload PDF</title>
+    <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="stylesheet" href="css/uikit.min.css" />
+        <script src="js/uikit.min.js"></script>
+        <script src="js/uikit-icons.min.js"></script>
+</head>
+<body>
+    <div class="uk-child-width-expand@s uk-text-center" uk-grid>
+        <form method="post" enctype="multipart/form-data" class="uk-form-stacked">
+            {% csrf_token %}
+            <div class="uk-form-controls">
+                <img src="{% static '/heartcaresite/ImagemInicial2.jpg' %}" width="200" height="150" alt="Your Image">
+            </div>
+            <br>
+            <br>
+
+            <div class="uk-form-controls">
+                {{ form.pdf_file.label_tag }}
+                {{ form.pdf_file }}
+                {{ form.pdf_file.errors }}
+               
+            </div>
+            <button type="submit" class="uk-button">Carregar arquivo</button>
+        </form>
+    </div>
+</body>
+</html>
+
