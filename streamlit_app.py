@@ -1,6 +1,7 @@
 import streamlit as st
 import pdfplumber
 from docx import Document
+from docx.shared import Inches, Pt
 from datetime import datetime, date
 import os
 import math
@@ -8,6 +9,16 @@ import tempfile
 import zipfile
 from io import BytesIO
 import base64
+try:
+    import fitz  # PyMuPDF
+    PYMUPDF_AVAILABLE = True
+except ImportError:
+    try:
+        import PyMuPDF as fitz  # Alternativa de import
+        PYMUPDF_AVAILABLE = True
+    except ImportError:
+        PYMUPDF_AVAILABLE = False
+from PIL import Image
 
 # Import the reference calculation functions
 from EcoDataReferences import (
@@ -124,6 +135,90 @@ def replace_text(text, data):
     for key, value in data.items():
         text = text.replace(key, str(value or ""))
     return text
+
+def extract_images_from_pdf(pdf_path, progress_callback=None):
+    """Extract all pages from PDF as images (renderiza cada página completa como imagem)"""
+    images = []
+    try:
+        if not PYMUPDF_AVAILABLE:
+            if progress_callback:
+                progress_callback("❌ PyMuPDF não está disponível! Instale com: pip install PyMuPDF")
+            return []
+        
+        # Usar PyMuPDF para renderizar páginas como imagens
+        if progress_callback:
+            progress_callback(f"📂 Abrindo PDF: {pdf_path}")
+        
+        pdf_document = fitz.open(pdf_path)
+        num_pages = len(pdf_document)
+        
+        if progress_callback:
+            progress_callback(f"📄 PDF tem {num_pages} página(s). Renderizando TODAS as páginas como imagens...")
+            progress_callback(f"   (Incluindo páginas com texto, imagens, ou ambos)")
+        
+        for page_num in range(num_pages):
+            try:
+                if progress_callback:
+                    progress_callback(f"🔄 Renderizando página {page_num + 1}/{num_pages}...")
+                
+                page = pdf_document[page_num]
+                
+                # Renderizar a página COMPLETA como imagem (incluindo tudo: texto, imagens, gráficos)
+                # zoom=3.0 para alta qualidade (3x = 216 DPI, excelente para imagens)
+                mat = fitz.Matrix(3.0, 3.0)  # 3x zoom para alta qualidade
+                
+                # Renderizar página completa - captura TUDO que está visível na página
+                # alpha=False remove transparência (melhor para Word)
+                pix = page.get_pixmap(matrix=mat, alpha=False)
+                
+                # IMPORTANTE: Renderizar TODAS as páginas, mesmo que pareçam vazias
+                # (algumas podem ter apenas imagens que são detectadas na renderização)
+                
+                # Salvar como PNG diretamente
+                img_data = pix.tobytes("png")
+                
+                # Salvar imagem temporariamente
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp_img:
+                    tmp_img.write(img_data)
+                    img_path = tmp_img.name
+                    
+                    images.append({
+                        'path': img_path,
+                        'page': page_num + 1,
+                        'width': pix.width,
+                        'height': pix.height,
+                        'format': 'png'
+                    })
+                    
+                    if progress_callback:
+                        progress_callback(f"✅ Página {page_num + 1} renderizada e salva ({pix.width}x{pix.height}px)")
+                
+                pix = None  # Liberar memória
+                
+            except Exception as e:
+                error_msg = f"❌ Erro ao renderizar página {page_num + 1}: {str(e)}"
+                if progress_callback:
+                    progress_callback(error_msg)
+                import traceback
+                if progress_callback:
+                    progress_callback(f"Detalhes: {traceback.format_exc()}")
+                continue
+        
+        pdf_document.close()
+        
+        if progress_callback:
+            progress_callback(f"✅ Total de {len(images)} página(s) renderizada(s)!")
+        
+    except Exception as e:
+        error_msg = f"❌ Erro ao processar PDF: {str(e)}"
+        if progress_callback:
+            progress_callback(error_msg)
+        import traceback
+        if progress_callback:
+            progress_callback(f"Detalhes: {traceback.format_exc()}")
+        return []
+    
+    return images
 
 def process_pdf_data(table_data):
     """Process extracted PDF table data"""
@@ -409,8 +504,8 @@ def process_pdf_data(table_data):
         'dia_sist_ve_result': dia_sist_ve_result,
     }
 
-def create_word_document(data, template_path, output_path):
-    """Create Word document from template"""
+def create_word_document(data, template_path, output_path, images=None):
+    """Create Word document from template and optionally add images from PDF"""
     try:
         doc = Document(template_path)
         
@@ -429,7 +524,99 @@ def create_word_document(data, template_path, output_path):
                     for run in paragraph.runs:
                         run.text = run.text.replace(key, str(value or ""))
         
-        doc.save(output_path)
+        # Add user-uploaded images in grids of 6 per page
+        if images and len(images) > 0:
+            st.write(f"🔍 Inserindo {len(images)} imagem(ns) em blocos de até 6 por página...")
+            try:
+                # Adicionar quebra de página antes das imagens
+                doc.add_page_break()
+                
+                # Adicionar título para a seção de imagens
+                title_para = doc.add_paragraph()
+                try:
+                    title_para.alignment = 1  # Centralizado
+                except:
+                    pass
+                title_run = title_para.add_run('Imagens Anexas')
+                try:
+                    title_run.font.size = Pt(16)
+                    title_run.font.bold = True
+                except:
+                    pass
+                
+                doc.add_paragraph()
+                
+                def chunk_list(seq, size):
+                    for i in range(0, len(seq), size):
+                        yield seq[i:i+size]
+                
+                images_added = 0
+                chunks = list(chunk_list(images, 6))
+                for chunk_index, chunk in enumerate(chunks):
+                    # 2 colunas x 3 linhas para imagens maiores
+                    table = doc.add_table(rows=3, cols=2)
+                    try:
+                        table.alignment = 1
+                    except:
+                        pass
+                    
+                    for idx, img_info in enumerate(chunk):
+                        cell = table.cell(idx // 2, idx % 2)
+                        paragraph = cell.paragraphs[0]
+                        try:
+                            paragraph.alignment = 1
+                        except:
+                            pass
+                        run = paragraph.add_run()
+                        
+                        img_path = img_info.get('path')
+                        if not img_path or not os.path.exists(img_path):
+                            st.warning(f"Imagem não encontrada: {img_path}")
+                            continue
+                        
+                        width = img_info.get('width')
+                        height = img_info.get('height')
+                        max_width_inches = 3.2  # para caber 2 colunas
+                        width_inches = width / 150.0 if width else max_width_inches  # assume ~150 DPI
+                        if width_inches <= 0 or width_inches > max_width_inches:
+                            width_inches = max_width_inches
+                        
+                        try:
+                            with open(img_path, "rb") as f:
+                                img_bytes = BytesIO(f.read())
+                                img_bytes.seek(0)
+                            run.add_picture(img_bytes, width=Inches(width_inches))
+                        except Exception as e:
+                            st.error(f"Erro ao inserir imagem {img_info.get('name') or idx + 1}: {e}")
+                            continue
+                        
+                        caption = cell.add_paragraph(img_info.get('name') or f"Imagem {images_added + 1}")
+                        try:
+                            caption.alignment = 1
+                            caption.runs[0].font.size = Pt(9)
+                        except:
+                            pass
+                        
+                        images_added += 1
+                    
+                    if chunk_index < len(chunks) - 1:
+                        doc.add_page_break()
+                
+                if images_added == 0:
+                    st.warning("⚠️ Nenhuma imagem foi adicionada ao documento.")
+                
+                # Salvar documento com imagens
+                doc.save(output_path)
+            
+            except Exception as e:
+                st.error(f"Erro ao processar imagens: {str(e)}")
+                import traceback
+                st.error(f"Detalhes: {traceback.format_exc()}")
+                doc.save(output_path)
+        else:
+            # Sem imagens, apenas salvar o documento normalmente
+            doc.save(output_path)
+        
         return True
     except Exception as e:
         st.error(f"Erro ao criar documento: {str(e)}")
@@ -446,6 +633,8 @@ def main():
         st.session_state.extracted_data = {}
     if 'pdf_file' not in st.session_state:
         st.session_state.pdf_file = None
+    if 'pdf_bytes' not in st.session_state:
+        st.session_state.pdf_bytes = None
 
     # Sidebar navigation
     st.sidebar.title("Navegação")
@@ -477,9 +666,13 @@ def main():
         )
         
         if uploaded_file is not None:
-            # Save uploaded file temporarily
+            # Guardar bytes do PDF no session_state para usar depois
+            pdf_bytes = uploaded_file.getvalue()
+            st.session_state.pdf_bytes = pdf_bytes
+            
+            # Salvar arquivo temporário para extração de dados
             with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
-                tmp_file.write(uploaded_file.getvalue())
+                tmp_file.write(pdf_bytes)
                 tmp_file_path = tmp_file.name
             
             st.session_state.pdf_file = tmp_file_path
@@ -967,159 +1160,214 @@ def main():
         
         extracted_data = st.session_state.extracted_data
         
-        with st.spinner("Gerando laudo..."):
-            try:
-                # Prepare data for document generation
-                data = {
-                    '<exam_date>': extracted_data.get('date_of_exam', ''),
-                    '<owner_name>': extracted_data.get('owner_name', ''),
-                    '<species>': extracted_data.get('species', ''),
-                    '<sex>': extracted_data.get('sex', ''),
-                    '<age>': extracted_data.get('age', ''),
-                    '<weight>': extracted_data.get('weight', ''),
-                    '<ficha>': extracted_data.get('identification', ''),
-                    '<breed>': extracted_data.get('breed', ''),
-                    '<animal_name>': extracted_data.get('animal_name', ''),
-                    '<frequencia_cardiaca>': extracted_data.get('frequencia_cardiaca', ''),
-                    '<ritmo>': extracted_data.get('ritmo', ''),
-                    '<description>': extracted_data.get('description', ''),
-                    '<report_date>': extracted_data.get('report_date', ''),
-                    '<diastole_septo_IV>': extracted_data.get('diastole_septo_iv', ''),
-                    '<diastole_parede_post_VE>': extracted_data.get('diast_par_post_ve', ''),
-                    '<diast_diametro_VE>': extracted_data.get('diast_diad_ve', ''),
-                    '<diametro_sist_VE>': extracted_data.get('dia_sist_ve', ''),
-                    '<encurtamento_fracional_VE>': extracted_data.get('encurtamento_frac_VE', ''),
-                    '<fracao_ejecao>': extracted_data.get('frac_ejecao', ''),
-                    '<diametro_interno_VE_diast_norm>': extracted_data.get('diad_interno_ve_diast_norm', ''),
-                    '<diametro_aortico>': extracted_data.get('diam_aortico', ''),
-                    '<diametro_AE>': extracted_data.get('diam_ae', ''),
-                    '<diam_atrio_ao_esq>': extracted_data.get('diam_atrio_ao_esq', ''),
-                    '<vmax_va>': extracted_data.get('vel_pico_va', ''),
-                    '<gp_max_va>': extracted_data.get('gp_max_va', ''),
-                    '<vel_pico_pulmonar>': extracted_data.get('vel_pico_pulmonar', ''),
-                    '<gradiente_pico_pulmonar>': extracted_data.get('gradiente_pico_pulmonar', ''),
-                    '<vel_pico_mitral_e>': extracted_data.get('veloc_pico_mit_onda_e', ''),
-                    '<vel_pico_mit_ond_a>': extracted_data.get('veloc_pico_mit_ond_a', ''),
-                    '<taxa_mitral_ea>': extracted_data.get('taxa_mitral_e_a', ''),
-                    '<temp_desacel_onda_e_mitral>': extracted_data.get('temp_desacel_onda_e_mitral', ''),
-                    '<temp_relax_isovol_mitral>': extracted_data.get('temp_relax_isovol_mitral', ''),
-                    '<temp_relax_isovol_e_mitral>': extracted_data.get('temp_relax_isovol_e_mitral', ''),
-                    '<onda_e_lateral>': extracted_data.get('onda_e_lateral', ''),
-                    '<onda_a_lateral>': extracted_data.get('onda_a_lateral', ''),
-                    '<razao_e_a_lat>': extracted_data.get('razao_ee_lat', ''),
-                    '<tapse>': extracted_data.get('tapse', ''),
-                    '<tapse_resultado>': extracted_data.get('tapse_resultado', ''),
-                    '<notes>': extracted_data.get('notes', ''),
-                    '<conclusion>': extracted_data.get('conclusion', ''),
-                    '<diam_aortico_result>': extracted_data.get('diam_aortico_result', ''),
-                    '<diastole_septo_iv_result>': extracted_data.get('diastole_septo_iv_result', ''),
-                    '<diam_ae_result>': extracted_data.get('diam_ae_result', ''),
-                    '<diast_par_post_ve_result>': extracted_data.get('diast_par_post_ve_result', ''),
-                    '<diast_diametro_VE_result>': extracted_data.get('diast_diad_ve_result', ''),
-                    '<dia_sist_ve_result>': extracted_data.get('dia_sist_ve_result', ''),
-                    '<mapse>': extracted_data.get('mapse', ''),
-                }
-                
-                # Template path
-                template_path = os.path.join(os.path.dirname(__file__), 'heartcaresite', 'upload_folder', 'Laudo Eco Modelo P.docx')
-                
-                if not os.path.exists(template_path):
-                    st.error("❌ Template não encontrado. Verifique se o arquivo 'Laudo Eco Modelo P.docx' está na pasta correta.")
-                    st.stop()
-                
-                # Create output filename
-                animal_name = extracted_data.get('animal_name', 'Animal')
-                date_str = extracted_data.get('date_of_exam', '')
-                
-                if date_str:
-                    try:
-                        date_object = datetime.strptime(date_str, "%d/%m/%Y")
-                        formatted_date = date_object.strftime("%d%m%Y")
-                    except:
-                        formatted_date = datetime.now().strftime("%d%m%Y")
-                else:
-                    formatted_date = datetime.now().strftime("%d%m%Y")
-                
-                output_filename = f"Laudo_{animal_name}_{formatted_date}.docx"
-                
-                # Create temporary file for output
-                with tempfile.NamedTemporaryFile(delete=False, suffix='.docx') as tmp_output:
-                    output_path = tmp_output.name
-                
-                # Generate document
-                if create_word_document(data, template_path, output_path):
-                    # Read the generated file
-                    with open(output_path, 'rb') as file:
-                        file_content = file.read()
-                    
-                    # Clean up temporary file
-                    os.unlink(output_path)
-                    
-                    st.success("✅ Laudo gerado com sucesso!")
-                    
-                    st.markdown("""
-                    <div class="success-box">
-                    <strong>Laudo Ecocardiográfico Gerado!</strong><br>
-                    O documento foi criado com todas as informações do exame e referências médicas calculadas.
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
-                    # Download button
-                    st.download_button(
-                        label="📥 Baixar Laudo",
-                        data=file_content,
-                        file_name=output_filename,
-                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                        type="primary"
-                    )
-                    
-                    # Show summary
-                    with st.expander("📋 Resumo do Laudo Gerado", expanded=True):
-                        col1, col2, col3 = st.columns(3)
-                        
-                        with col1:
-                            st.write("**Informações do Animal:**")
-                            st.write(f"- Nome: {extracted_data.get('animal_name', 'N/A')}")
-                            st.write(f"- Espécie: {extracted_data.get('species', 'N/A')}")
-                            st.write(f"- Raça: {extracted_data.get('breed', 'N/A')}")
-                            st.write(f"- Peso: {extracted_data.get('weight', 'N/A')}")
-                            st.write(f"- Data do Exame: {extracted_data.get('date_of_exam', 'N/A')}")
-                        
-                        with col2:
-                            st.write("**Parâmetros Cardíacos:**")
-                            if extracted_data.get('frequencia_cardiaca'):
-                                st.write(f"- Frequência Cardíaca: {extracted_data.get('frequencia_cardiaca')} bpm")
-                            if extracted_data.get('ritmo'):
-                                st.write(f"- Ritmo: {extracted_data.get('ritmo')}")
-                            if extracted_data.get('frac_ejecao'):
-                                st.write(f"- Fração Ejeção: {extracted_data.get('frac_ejecao')}%")
-                            if extracted_data.get('tapse'):
-                                st.write(f"- TAPSE: {extracted_data.get('tapse')} mm")
-                        
-                        with col3:
-                            st.write("**Referências Calculadas:**")
-                            if extracted_data.get('tapse_resultado'):
-                                st.write(f"- TAPSE: {extracted_data.get('tapse_resultado')}")
-                            if extracted_data.get('diam_aortico_result'):
-                                st.write(f"- Diâmetro Aórtico: {extracted_data.get('diam_aortico_result')}")
-                            if extracted_data.get('diam_ae_result'):
-                                st.write(f"- Diâmetro AE: {extracted_data.get('diam_ae_result')}")
-                            if extracted_data.get('diastole_septo_iv_result'):
-                                st.write(f"- Diástole-Septo IV: {extracted_data.get('diastole_septo_iv_result')}")
-                    
-                    # Option to start new report
-                    if st.button("🔄 Gerar Novo Laudo", type="secondary"):
-                        st.session_state.step = 1
-                        st.session_state.extracted_data = {}
-                        st.session_state.pdf_file = None
-                        st.rerun()
-                
-                else:
-                    st.error("❌ Erro ao gerar o laudo. Verifique os dados e tente novamente.")
+        st.markdown("---")
+        uploaded_images = st.file_uploader(
+            "📷 Envie imagens (JPEG/PNG) para incluir no laudo",
+            type=["png", "jpg", "jpeg"],
+            accept_multiple_files=True,
+            help="As imagens serão inseridas em grupos de até 6 por página no final do documento."
+        )
+        if uploaded_images:
+            st.info(f"{len(uploaded_images)} imagem(ns) pronta(s) para inclusão.")
+        st.markdown("---")
+        
+        # Botão para gerar laudo
+        if st.button("📄 Gerar Laudo", type="primary"):
             
-            except Exception as e:
-                st.error(f"❌ Erro ao gerar o laudo: {str(e)}")
-                st.exception(e)
+            with st.spinner("Gerando laudo..."):
+                try:
+                    # Preparar imagens enviadas pelo usuário
+                    images = []
+                    temp_image_paths = []
+                    if uploaded_images:
+                        for idx, img_file in enumerate(uploaded_images):
+                            try:
+                                ext = os.path.splitext(img_file.name)[1] or ".png"
+                                with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp_img:
+                                    tmp_img.write(img_file.getbuffer())
+                                    img_path = tmp_img.name
+                                    temp_image_paths.append(img_path)
+                                
+                                with Image.open(img_path) as img_obj:
+                                    width, height = img_obj.size
+                                
+                                images.append({
+                                    "path": img_path,
+                                    "page": idx + 1,
+                                    "width": width,
+                                    "height": height,
+                                    "name": img_file.name,
+                                })
+                            except Exception as e:
+                                st.warning(f"Não foi possível usar a imagem {img_file.name}: {e}")
+                    
+                    if uploaded_images and not images:
+                        st.warning("⚠️ Nenhuma imagem válida foi carregada; o laudo será salvo sem imagens.")
+                    
+                    # Prepare data for document generation
+                    data = {
+                        '<exam_date>': extracted_data.get('date_of_exam', ''),
+                        '<owner_name>': extracted_data.get('owner_name', ''),
+                        '<species>': extracted_data.get('species', ''),
+                        '<sex>': extracted_data.get('sex', ''),
+                        '<age>': extracted_data.get('age', ''),
+                        '<weight>': extracted_data.get('weight', ''),
+                        '<ficha>': extracted_data.get('identification', ''),
+                        '<breed>': extracted_data.get('breed', ''),
+                        '<animal_name>': extracted_data.get('animal_name', ''),
+                        '<frequencia_cardiaca>': extracted_data.get('frequencia_cardiaca', ''),
+                        '<ritmo>': extracted_data.get('ritmo', ''),
+                        '<description>': extracted_data.get('description', ''),
+                        '<report_date>': extracted_data.get('report_date', ''),
+                        '<diastole_septo_IV>': extracted_data.get('diastole_septo_iv', ''),
+                        '<diastole_parede_post_VE>': extracted_data.get('diast_par_post_ve', ''),
+                        '<diast_diametro_VE>': extracted_data.get('diast_diad_ve', ''),
+                        '<diametro_sist_VE>': extracted_data.get('dia_sist_ve', ''),
+                        '<encurtamento_fracional_VE>': extracted_data.get('encurtamento_frac_VE', ''),
+                        '<fracao_ejecao>': extracted_data.get('frac_ejecao', ''),
+                        '<diametro_interno_VE_diast_norm>': extracted_data.get('diad_interno_ve_diast_norm', ''),
+                        '<diametro_aortico>': extracted_data.get('diam_aortico', ''),
+                        '<diametro_AE>': extracted_data.get('diam_ae', ''),
+                        '<diam_atrio_ao_esq>': extracted_data.get('diam_atrio_ao_esq', ''),
+                        '<vmax_va>': extracted_data.get('vel_pico_va', ''),
+                        '<gp_max_va>': extracted_data.get('gp_max_va', ''),
+                        '<vel_pico_pulmonar>': extracted_data.get('vel_pico_pulmonar', ''),
+                        '<gradiente_pico_pulmonar>': extracted_data.get('gradiente_pico_pulmonar', ''),
+                        '<vel_pico_mitral_e>': extracted_data.get('veloc_pico_mit_onda_e', ''),
+                        '<vel_pico_mit_ond_a>': extracted_data.get('veloc_pico_mit_ond_a', ''),
+                        '<taxa_mitral_ea>': extracted_data.get('taxa_mitral_e_a', ''),
+                        '<temp_desacel_onda_e_mitral>': extracted_data.get('temp_desacel_onda_e_mitral', ''),
+                        '<temp_relax_isovol_mitral>': extracted_data.get('temp_relax_isovol_mitral', ''),
+                        '<temp_relax_isovol_e_mitral>': extracted_data.get('temp_relax_isovol_e_mitral', ''),
+                        '<onda_e_lateral>': extracted_data.get('onda_e_lateral', ''),
+                        '<onda_a_lateral>': extracted_data.get('onda_a_lateral', ''),
+                        '<razao_e_a_lat>': extracted_data.get('razao_ee_lat', ''),
+                        '<tapse>': extracted_data.get('tapse', ''),
+                        '<tapse_resultado>': extracted_data.get('tapse_resultado', ''),
+                        '<notes>': extracted_data.get('notes', ''),
+                        '<conclusion>': extracted_data.get('conclusion', ''),
+                        '<diam_aortico_result>': extracted_data.get('diam_aortico_result', ''),
+                        '<diastole_septo_iv_result>': extracted_data.get('diastole_septo_iv_result', ''),
+                        '<diam_ae_result>': extracted_data.get('diam_ae_result', ''),
+                        '<diast_par_post_ve_result>': extracted_data.get('diast_par_post_ve_result', ''),
+                        '<diast_diametro_VE_result>': extracted_data.get('diast_diad_ve_result', ''),
+                        '<dia_sist_ve_result>': extracted_data.get('dia_sist_ve_result', ''),
+                        '<mapse>': extracted_data.get('mapse', ''),
+                    }
+                    
+                    # Template path
+                    template_path = os.path.join(os.path.dirname(__file__), 'heartcaresite', 'upload_folder', 'Laudo Eco Modelo P.docx')
+                
+                    if not os.path.exists(template_path):
+                        st.error("❌ Template não encontrado. Verifique se o arquivo 'Laudo Eco Modelo P.docx' está na pasta correta.")
+                        st.stop()
+                    
+                    # Create output filename
+                    animal_name = extracted_data.get('animal_name', 'Animal')
+                    date_str = extracted_data.get('date_of_exam', '')
+                    
+                    if date_str:
+                        try:
+                            date_object = datetime.strptime(date_str, "%d/%m/%Y")
+                            formatted_date = date_object.strftime("%d%m%Y")
+                        except:
+                            formatted_date = datetime.now().strftime("%d%m%Y")
+                    else:
+                        formatted_date = datetime.now().strftime("%d%m%Y")
+                    
+                    output_filename = f"Laudo_{animal_name}_{formatted_date}.docx"
+                    
+                    # Create temporary file for output
+                    with tempfile.NamedTemporaryFile(delete=False, suffix='.docx') as tmp_output:
+                        output_path = tmp_output.name
+                    
+                    # Generate document
+                    if create_word_document(data, template_path, output_path, images=images if images else None):
+                        # Read the generated file
+                        with open(output_path, 'rb') as file:
+                            file_content = file.read()
+                        
+                        # Clean up temporary file
+                        os.unlink(output_path)
+                        
+                        success_msg = "✅ Laudo gerado com sucesso!"
+                        if images and len(images) > 0:
+                            success_msg += f" ({len(images)} imagem(ns) incluída(s))"
+                        
+                        st.success(success_msg)
+                        
+                        st.markdown("""
+                        <div class="success-box">
+                        <strong>Laudo Ecocardiográfico Gerado!</strong><br>
+                        O documento foi criado com todas as informações do exame e referências médicas calculadas.
+                        """ + (f"<br>📷 {len(images)} imagem(ns) do PDF foram incluídas." if images and len(images) > 0 else "") + """
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        # Download button
+                        st.download_button(
+                            label="📥 Baixar Laudo",
+                            data=file_content,
+                            file_name=output_filename,
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            type="primary"
+                        )
+                    
+                        # Show summary
+                        with st.expander("📋 Resumo do Laudo Gerado", expanded=True):
+                            col1, col2, col3 = st.columns(3)
+                            
+                            with col1:
+                                st.write("**Informações do Animal:**")
+                                st.write(f"- Nome: {extracted_data.get('animal_name', 'N/A')}")
+                                st.write(f"- Espécie: {extracted_data.get('species', 'N/A')}")
+                                st.write(f"- Raça: {extracted_data.get('breed', 'N/A')}")
+                                st.write(f"- Peso: {extracted_data.get('weight', 'N/A')}")
+                                st.write(f"- Data do Exame: {extracted_data.get('date_of_exam', 'N/A')}")
+                            
+                            with col2:
+                                st.write("**Parâmetros Cardíacos:**")
+                                if extracted_data.get('frequencia_cardiaca'):
+                                    st.write(f"- Frequência Cardíaca: {extracted_data.get('frequencia_cardiaca')} bpm")
+                                if extracted_data.get('ritmo'):
+                                    st.write(f"- Ritmo: {extracted_data.get('ritmo')}")
+                                if extracted_data.get('frac_ejecao'):
+                                    st.write(f"- Fração Ejeção: {extracted_data.get('frac_ejecao')}%")
+                                if extracted_data.get('tapse'):
+                                    st.write(f"- TAPSE: {extracted_data.get('tapse')} mm")
+                            
+                            with col3:
+                                st.write("**Referências Calculadas:**")
+                                if extracted_data.get('tapse_resultado'):
+                                    st.write(f"- TAPSE: {extracted_data.get('tapse_resultado')}")
+                                if extracted_data.get('diam_aortico_result'):
+                                    st.write(f"- Diâmetro Aórtico: {extracted_data.get('diam_aortico_result')}")
+                                if extracted_data.get('diam_ae_result'):
+                                    st.write(f"- Diâmetro AE: {extracted_data.get('diam_ae_result')}")
+                                if extracted_data.get('diastole_septo_iv_result'):
+                                    st.write(f"- Diástole-Septo IV: {extracted_data.get('diastole_septo_iv_result')}")
+                        
+                        # Option to start new report
+                        if st.button("🔄 Gerar Novo Laudo", type="secondary"):
+                            st.session_state.step = 1
+                            st.session_state.extracted_data = {}
+                            st.session_state.pdf_file = None
+                            st.session_state.pdf_bytes = None
+                            st.rerun()
+                    else:
+                        st.error("❌ Erro ao gerar o laudo. Verifique os dados e tente novamente.")
+                
+                except Exception as e:
+                    st.error(f"❌ Erro ao gerar o laudo: {str(e)}")
+                    st.exception(e)
+                
+                finally:
+                    for p in temp_image_paths:
+                        try:
+                            if os.path.exists(p):
+                                os.unlink(p)
+                        except:
+                            pass
 
     # Footer
     st.markdown("---")
