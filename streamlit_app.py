@@ -576,9 +576,15 @@ def create_word_document(data, template_path, output_path, images=None):
                         
                         width = img_info.get('width')
                         height = img_info.get('height')
-                        max_width_inches = 3.2  # para caber 2 colunas
-                        width_inches = width / 150.0 if width else max_width_inches  # assume ~150 DPI
-                        if width_inches <= 0 or width_inches > max_width_inches:
+                        max_width_inches = 3.2  # 2 colunas
+                        max_height_inches = 3.5  # 3 linhas
+                        # Escala respeitando proporção e limitando altura/largura para não quebrar página
+                        if width and height:
+                            ratio_w = max_width_inches / float(width)
+                            ratio_h = max_height_inches / float(height)
+                            scale = min(ratio_w, ratio_h)
+                            width_inches = max_width_inches if scale >= 1 else max_width_inches * scale
+                        else:
                             width_inches = max_width_inches
                         
                         try:
