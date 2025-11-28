@@ -551,10 +551,12 @@ def create_word_document(data, template_path, output_path, images=None):
                         yield seq[i:i+size]
                 
                 images_added = 0
-                chunks = list(chunk_list(images, 6))
+                # Agrupar 4 por página (2x2) para aumentar o tamanho e evitar quebra
+                chunk_size = 4
+                chunks = list(chunk_list(images, chunk_size))
                 for chunk_index, chunk in enumerate(chunks):
-                    # 2 colunas x 3 linhas para imagens maiores
-                    table = doc.add_table(rows=3, cols=2)
+                    # 2 colunas x 2 linhas
+                    table = doc.add_table(rows=2, cols=2)
                     try:
                         table.alignment = 1
                     except:
@@ -576,9 +578,9 @@ def create_word_document(data, template_path, output_path, images=None):
                         
                         width = img_info.get('width')
                         height = img_info.get('height')
-                        max_width_inches = 3.2  # 2 colunas
-                        max_height_inches = 3.5  # 3 linhas
-                        # Escala respeitando proporção e limitando altura/largura para não quebrar página
+                        max_width_inches = 4.0   # 2 colunas
+                        max_height_inches = 4.0  # 2 linhas
+                        # Escala respeitando proporção e limitando altura/largura
                         if width and height:
                             ratio_w = max_width_inches / float(width)
                             ratio_h = max_height_inches / float(height)
